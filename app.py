@@ -1,77 +1,83 @@
-import streamlit as st, pandas as pd, glob
-try:
-    import fitz
-except: fitz=None
+import streamlit as st
+import pandas as pd
+import glob
 
-st.set_page_config(layout="wide", page_title="Painel Sete Lagos - 3.105")
-st.title("🗺️ Painel Cidades Atendidas + Tabela Parceiros")
+st.set_page_config(layout="wide", page_title="Sete Lagos Final")
+st.title("Painel Sete Lagos - 5 Painéis")
 
-TABELAS_REAIS = pd.DataFrame([
-    {"SIGLA":"EJM","ORIGEM_DESTINO":"Expresso Monlevade - Joao Monlevade","MINIMO":50.00,"PERC":0.40,"R$_KG":0,"CALCULO":"MAX(R$50, 40% x seu frete)","PRAZO":"Joao Monlevade D+1, demais 3d","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"BH x CFAP","MINIMO":55.00,"PERC":0.35,"R$_KG":0.38,"CALCULO":"MAX(R$55, 35% x frete, 0,38 x peso) + Ped R$4,50 + Coleta R$50 + TDE R$278","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"BH x GVAP","MINIMO":58.30,"PERC":0.35,"R$_KG":0.45,"CALCULO":"MAX(R$58,30, 35% x frete, 0,45 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"BH x MOCP","MINIMO":60.00,"PERC":0.40,"R$_KG":0.55,"CALCULO":"MAX(R$60, 40% x frete, 0,55 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"BH x CFAI/GVAI/GV3I","MINIMO":80.00,"PERC":0.45,"R$_KG":0.62,"CALCULO":"MAX(R$80, 45% x frete, 0,62 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"BH x Interior MG","MINIMO":97.00,"PERC":0.50,"R$_KG":0.86,"CALCULO":"MAX(R$97, 50% x frete, 0,86 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"SP x CFAI/GVAI/GV3I - 645 SP","MINIMO":90.50,"PERC":0,"R$_KG":0.71,"CALCULO":"MAX(R$90,50, 0,71 x peso) + Ped R$5,80 + Coleta R$50 + TDE R$278","TEM_CUSTO":"SIM"},
-    {"SIGLA":"GRF","ORIGEM_DESTINO":"SP x Interior MG","MINIMO":110.20,"PERC":0,"R$_KG":0.95,"CALCULO":"MAX(R$110,20, 0,95 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"TRU","ORIGEM_DESTINO":"BHEP/SPOP x ULAP POLO","MINIMO":46.31,"PERC":0.40,"R$_KG":0.46305,"CALCULO":"MAX(R$46,31, 40% x frete, 0,463 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"TRU","ORIGEM_DESTINO":"BHEP/SPOP x ULAR REGIAO","MINIMO":52.09,"PERC":0.40,"R$_KG":0.4862,"CALCULO":"MAX(R$52,09, 40% x frete, 0,486 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"TRU","ORIGEM_DESTINO":"BHEP/SPOP x ULAI INTERIOR","MINIMO":69.46,"PERC":0.45,"R$_KG":0.69458,"CALCULO":"MAX(R$69,46, 45% x frete, 0,694 x peso)","TEM_CUSTO":"SIM"},
-    {"SIGLA":"DCC","ORIGEM_DESTINO":"MG 165 cidades","MINIMO":0,"PERC":0,"R$_KG":0,"CALCULO":"R$ 0 - Veiculo transf BHZ deixou","TEM_CUSTO":"NAO"},
-])
+abas = st.tabs(["📍 1-CIDADES ATENDIDAS", "🤝 2-PARCEIROS", "📦 3-CUSTO DISTRIB", "🚛 4-CUSTO TRANSF", "💰 5-RESULTADO CLIENTE"])
 
-if "logado" not in st.session_state: st.session_state.logado=False
-if not st.session_state.logado:
-    st.title("🔐 Acesso Comercial")
-    if st.text_input("Senha", type="password")=="comercial2024":
-        st.session_state.logado=True; st.rerun()
-    st.stop()
+# 1 - CIDADES ATENDIDAS - ARQUIVO ÚNICO
+with abas[0]:
+    st.subheader("1 - Cidades Atendidas - Arquivo Único")
+    up = st.file_uploader("Anexar se quiser trocar (csv, xlsx)", type=["xlsx","csv","sswweb"], key="c1")
 
-@st.cache_data
-def carregar():
-    dfs=[]
-    for arq in glob.glob("ssw0137_modeloSLG_1_*.csv"):
-        try: dfs.append(pd.read_csv(arq, sep=';', encoding='latin-1'))
-        except: pass
-    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    def ler(f):
+        try:
+            if str(f).endswith(".csv") or "csv" in str(f).lower() or str(f).endswith(".sswweb"):
+                return pd.read_csv(f, sep=None, engine='python', encoding='latin1', dtype=str)
+            else:
+                return pd.read_excel(f, dtype=str)
+        except Exception as e:
+            st.error(f"Erro: {e}")
+            return pd.DataFrame()
 
-df_all=carregar()
-st.success(f"✅ {len(df_all)} cidades")
+    if up:
+        st.session_state["cidades"] = ler(up)
+    elif "cidades" not in st.session_state:
+        # lê do GitHub
+        if glob.glob("*Cidades*.csv"):
+            st.session_state["cidades"] = pd.read_csv(glob.glob("*Cidades*.csv")[0], sep=None, engine='python', encoding='latin1', dtype=str)
+        else:
+            st.session_state["cidades"] = pd.DataFrame()
 
-tab1,tab2,tab3,tab4=st.tabs(["🗺️ CIDADES 3.105","🏢 PARCEIROS editar/importar","💰 TABELAS GRF/EJM/TRU","🧮 SIMULADOR"])
+    if not st.session_state["cidades"].empty:
+        df = st.session_state["cidades"]
+        st.metric("Total", len(df))
+        if "UF" in df.columns or "Uf" in df.columns:
+            col_uf = "UF" if "UF" in df.columns else "Uf"
+            uf = st.selectbox("UF", ["TODOS"] + sorted(df[col_uf].dropna().astype(str).str.strip().unique()), key="uf1")
+            if uf!="TODOS":
+                df = df[df[col_uf]==uf]
+        st.write("Editável dentro do app:")
+        st.data_editor(df, num_rows="dynamic", use_container_width=True, height=600, key="ed1")
+    else:
+        st.warning("Aguardando Cidades Atendidas.csv")
 
-with tab1:
-    uf=st.selectbox("UF",["TODOS"]+sorted(df_all["UF"].unique().tolist()))
-    df_f=df_all if uf=="TODOS" else df_all[df_all["UF"]==uf]
-    st.metric(f"Cidades {uf}",len(df_f))
-    st.data_editor(df_f,height=600,use_container_width=True)
+# 2 - PARCEIROS
+with abas[1]:
+    st.subheader("2 - Tabelas de Parceiros - Editável + Anexar")
+    up2 = st.file_uploader("Anexar arquivo de parceiros", type=["xlsx","csv"], key="c2")
+    if up2:
+        st.session_state["parc"] = ler(up2)
+    if "parc" not in st.session_state:
+        st.session_state["parc"] = pd.DataFrame(columns=["UF","CIDADE","PARCEIRO","CUSTO"])
+    st.data_editor(st.session_state["parc"], num_rows="dynamic", use_container_width=True, height=500, key="ed2")
 
-with tab2:
-    st.markdown("#### ✏️ Editar + 📤 Importar - campo que voce pediu")
-    df_edit=st.data_editor(TABELAS_REAIS,num_rows="dynamic",use_container_width=True,key="edit")
-    if st.button("💾 Salvar tabela editada"):
-        df_edit.to_excel("tabela_parceiros_editada.xlsx",index=False)
-        st.success("Salvo!")
-    up=st.file_uploader("Importar nova tabela PDF/Excel/Imagem",type=["pdf","xlsx","png","jpg","jpeg"])
-    if up: st.success(f"{up.name} recebido - importar funcionando")
+# 3 - DISTRIB
+with abas[2]:
+    st.subheader("3 - Custo de Distribuição por Unidade")
+    up3 = st.file_uploader("Anexar", type=["xlsx","csv"], key="c3")
+    if up3: st.session_state["dist"] = ler(up3)
+    if "dist" not in st.session_state: st.session_state["dist"] = pd.DataFrame(columns=["UNIDADE","CUSTO"])
+    st.data_editor(st.session_state["dist"], num_rows="dynamic", use_container_width=True, height=500, key="ed3")
 
-with tab3: st.dataframe(TABELAS_REAIS,use_container_width=True)
+# 4 - TRANSF
+with abas[3]:
+    st.subheader("4 - Custo de Transferência")
+    up4 = st.file_uploader("Anexar", type=["xlsx","csv"], key="c4")
+    if up4: st.session_state["transf"] = ler(up4)
+    if "transf" not in st.session_state: st.session_state["transf"] = pd.DataFrame(columns=["ORIGEM","DESTINO","CUSTO"])
+    st.data_editor(st.session_state["transf"], num_rows="dynamic", use_container_width=True, height=500, key="ed4")
 
-with tab4:
-    s=st.selectbox("Rota",TABELAS_REAIS["ORIGEM_DESTINO"].tolist())
-    peso=st.number_input("Peso kg",100.0)
-    frete=st.number_input("Seu frete R$",1000.0)
-    if st.button("Calcular",type="primary"):
-        lin=TABELAS_REAIS[TABELAS_REAIS["ORIGEM_DESTINO"]==s].iloc[0]
-        calc=max(lin["MINIMO"],peso*lin["R$_KG"],frete*lin["PERC"] if lin["PERC"]>0 else 0)
-        if lin["SIGLA"]=="EJM": calc=max(50,frete*0.40)
-        if lin["SIGLA"]=="GRF": calc+=55.8
-        if lin["TEM_CUSTO"]=="NAO": calc=0
-        st.metric(f"R$ {lin['SIGLA']}",f"R$ {calc:.2f}")
-
-if st.button("📥 Gerar EXCEL 2 abas"):
-    with pd.ExcelWriter("PAINEL_SETE_LAGOS_FINAL.xlsx",engine="openpyxl") as w:
-        df_all.to_excel(w,sheet_name="CIDADES_ATENDIDAS_3105",index=False)
-        TABELAS_REAIS.to_excel(w,sheet_name="TABELA_DE_PARCEIROS",index=False)
-    st.success("Gerado PAINEL_SETE_LAGOS_FINAL.xlsx")
+# 5 - RESULTADO CLIENTE
+with abas[4]:
+    st.subheader("5 - Resultado por Cliente")
+    arqs = glob.glob("82*.xlsx") + glob.glob("83*.xlsx")
+    if arqs:
+        dfs = [pd.read_excel(a, dtype=str) for a in arqs]
+        df = pd.concat(dfs, ignore_index=True)
+        st.metric("CTes carregados", len(df))
+        st.dataframe(df, use_container_width=True, height=500)
+    else:
+        st.info("Suba 82 e 83")
