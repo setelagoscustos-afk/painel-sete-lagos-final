@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-
 st.set_page_config(layout="wide")
 
 arquivos = st.file_uploader("Suba as planilhas", type=["xlsx"], accept_multiple_files=True)
